@@ -15,21 +15,22 @@ A server is configured when **either**:
 
 1. If `visualize` from plan-viz is already in the available MCP tools, skip to **Inputs**.
 2. Otherwise read [`.cursor/mcp.json`](.cursor/mcp.json) if it exists. Then read `~/.cursor/mcp.json` if it exists. Look for `mcpServers.plan-viz`.
-3. Treat the entry as missing or invalid unless it is stdio `node` with args that end in `dist/stdio.js` (this repo), or `npx` / `plan-viz-mcp`.
+3. Treat the entry as missing or invalid unless it is stdio `npx` of the [v0.1.0 release tarball](https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.1.0), `npx` / `plan-viz-mcp`, `npx` / `github:NGA-TRAN/plan_viz_mcp`, or `node` with args that end in `dist/stdio.js`.
 
 ### Configure if missing or invalid
 
-1. Ensure the server can start from this workspace:
-   - If `dist/stdio.js` is missing, run `npm install` (if `node_modules` is missing) then `npm run build`.
-   - For PNG later, Chromium must be installed (`npx playwright install chromium`); do that only if the user asked for `.png` or left format default.
+1. For PNG later, Chromium must be installed (`npx playwright install chromium`); do that only if the user asked for `.png` or left format default.
 2. Write or merge **project** [`.cursor/mcp.json`](.cursor/mcp.json). Preserve every other `mcpServers` entry. Set:
 
 ```json
 {
   "mcpServers": {
     "plan-viz": {
-      "command": "node",
-      "args": ["${workspaceFolder}/dist/stdio.js"]
+      "command": "npx",
+      "args": [
+        "-y",
+        "https://github.com/NGA-TRAN/plan_viz_mcp/releases/download/v0.1.0/plan-viz-mcp-0.1.0.tgz"
+      ]
     }
   }
 }

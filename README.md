@@ -22,7 +22,23 @@ Chromium is needed only for `.png`. JSON output works without a browser. On Linu
 
 ## stdio
 
-Add this local-source configuration to `.cursor/mcp.json` or an MCP host's server settings. Replace the path with your checkout's absolute path. Ensure the host's `node` executable is a supported version; use an absolute path to Node if necessary.
+The published [v0.1.0](https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.1.0) tarball is the default Cursor configuration. Add it to `.cursor/mcp.json` or an MCP host's server settings. Ensure the host's `node` executable is a supported version; use an absolute path to Node if necessary.
+
+```json
+{
+  "mcpServers": {
+    "plan-viz": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "https://github.com/NGA-TRAN/plan_viz_mcp/releases/download/v0.1.0/plan-viz-mcp-0.1.0.tgz"
+      ]
+    }
+  }
+}
+```
+
+After npm publication, `npx -y plan-viz-mcp` is equivalent. For a local checkout, build first (`npm run build`) and point the host at `dist/stdio.js`:
 
 ```json
 {
@@ -30,19 +46,6 @@ Add this local-source configuration to `.cursor/mcp.json` or an MCP host's serve
     "plan-viz": {
       "command": "node",
       "args": ["/absolute/path/to/plan_viz_mcp_codex/dist/stdio.js"]
-    }
-  }
-}
-```
-
-The executable `plan-viz-mcp` also starts stdio after installing the package. The following configuration is for **after npm publication**; this project has not been published as part of this build:
-
-```json
-{
-  "mcpServers": {
-    "plan-viz": {
-      "command": "npx",
-      "args": ["-y", "plan-viz-mcp"]
     }
   }
 }

@@ -1,8 +1,11 @@
 {
   "mcpServers": {
     "plan-viz": {
-      "command": "node",
-      "args": ["${workspaceFolder}/dist/stdio.js"]
+      "command": "npx",
+      "args": [
+        "-y",
+        "https://github.com/NGA-TRAN/plan_viz_mcp/releases/download/v0.1.0/plan-viz-mcp-0.1.0.tgz"
+      ]
     }
   }
 }
