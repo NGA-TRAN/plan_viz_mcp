@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/NGA-TRAN/plan_viz_mcp/security/advisories/new
+    about: Report a security issue privately. Do not file a public bug.
+  - name: plan-viz library
+    url: https://github.com/NGA-TRAN/plan_viz/issues
+    about: Operator coverage and convertPlanToExcalidraw behavior belong in plan-viz.

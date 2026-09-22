@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest an enhancement to the MCP server
+title: '[Feature]: '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This server exposes one tool, `visualize`. Requests for new DataFusion operators belong in [plan-viz](https://github.com/NGA-TRAN/plan_viz).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard or missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The behavior you want, including any new options or limits.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

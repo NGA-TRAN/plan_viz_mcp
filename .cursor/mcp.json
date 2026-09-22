@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "plan-viz": {
+      "command": "node",
+      "args": ["${workspaceFolder}/dist/stdio.js"]
+    }
+  }
+}
