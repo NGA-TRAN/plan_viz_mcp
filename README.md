@@ -22,7 +22,7 @@ Chromium is needed only for `.png`. JSON output works without a browser. On Linu
 
 ## stdio
 
-The published [v0.1.0](https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.1.0) tarball can be added to `.cursor/mcp.json` or an MCP host's server settings. That existing release does not contain the dependency upgrade or PNG optimizations in this checkout. Use the local build configuration below to use these changes. Ensure the host's `node` executable is a supported version; use an absolute path to Node if necessary.
+The published [v0.1.1](https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.1.1) tarball includes the operator-label fix and PNG renderer reuse. Add it to `.cursor/mcp.json` or an MCP host's server settings. Ensure the host's `node` executable is a supported version; use an absolute path to Node if necessary.
 
 ```json
 {
@@ -31,7 +31,7 @@ The published [v0.1.0](https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.
       "command": "npx",
       "args": [
         "-y",
-        "https://github.com/NGA-TRAN/plan_viz_mcp/releases/download/v0.1.0/plan-viz-mcp-0.1.0.tgz"
+        "https://github.com/NGA-TRAN/plan_viz_mcp/releases/download/v0.1.1/plan-viz-mcp-0.1.1.tgz"
       ]
     }
   }
@@ -39,6 +39,8 @@ The published [v0.1.0](https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.
 ```
 
 The committed Cursor configuration uses the local build and [Cursor's `${workspaceFolder}` interpolation](https://cursor.com/docs/mcp#config-interpolation), so it works regardless of the checkout location. Build first (`npm run build`) and ensure Cursor resolves Node 24. If it resolves an older version, select a supported Node installation for the host or locally set `command` to that executable's absolute path; keep personal paths out of commits.
+
+When using the release tarball, install the matching Chromium version once for PNG output: `npx -y playwright@1.63.0 install chromium`. Excalidraw output does not need Chromium.
 
 After npm publication, `npx -y plan-viz-mcp` can launch the published package. For other MCP hosts, use an absolute path to the local build:
 
