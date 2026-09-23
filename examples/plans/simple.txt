@@ -1,0 +1,3 @@
+ProjectionExec: expr=[id, name, age]
+  FilterExec: age > 18
+    DataSourceExec: file_groups={1 groups: [[data.parquet]]}

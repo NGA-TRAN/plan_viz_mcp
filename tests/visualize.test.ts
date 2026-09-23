@@ -3,6 +3,7 @@ import { convertPlanToExcalidraw } from 'plan-viz';
 import { inputSchema, outputSchema } from '../src/lib/schemas.js';
 import { MAX_PLAN_BYTES, MAX_RESULT_BYTES } from '../src/lib/constants.js';
 import { visualize } from '../src/lib/visualize.js';
+import type { Scene } from '../src/lib/visualize.js';
 import { samplePlan, explainPlan, analyzePlan } from './fixtures/plans.js';
 import { fakePng } from './helpers.js';
 
@@ -51,6 +52,22 @@ describe('visualize', () => {
       expect(result.format).toBe('.excalidraw');
       if (result.format !== '.excalidraw') throw new Error('Wrong format');
       expect(JSON.parse(result.text).elements.length).toBeGreaterThan(0);
+      // v0.1.23 fixes labels in the exported JSON itself, before any browser repair.
+      const scene: Scene = JSON.parse(result.text);
+      const elements = new Map(
+        scene.elements.map((element) => [element.id, element]),
+      );
+      const labels = scene.elements.filter(
+        (element) => element.type === 'text' && element.containerId,
+      );
+      expect(labels.length).toBeGreaterThan(0);
+      for (const label of labels) {
+        if (label.type !== 'text') throw new Error('Expected text');
+        expect(elements.get(label.containerId!)?.boundElements).toContainEqual({
+          id: label.id,
+          type: 'text',
+        });
+      }
       expect(renderPng).not.toHaveBeenCalled();
     },
   );

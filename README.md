@@ -6,7 +6,7 @@
 
 Convert DataFusion physical execution plans into editable Excalidraw diagrams or PNG images using one MCP tool: `visualize`.
 
-The server uses the public `convertPlanToExcalidraw` API from `plan-viz`. It accepts raw indented physical plans and DataFusion EXPLAIN / EXPLAIN ANALYZE tables. It does not execute SQL, connect to a database, or save submitted plans or generated results to disk.
+The server uses the public `convertPlanToExcalidraw` API from `plan-viz` **0.1.23**, including its fix for missing operator labels in Excalidraw exports. It accepts raw indented physical plans and DataFusion EXPLAIN / EXPLAIN ANALYZE tables. It does not execute SQL, connect to a database, or save submitted plans or generated results to disk.
 
 ## Install from source
 
@@ -22,7 +22,7 @@ Chromium is needed only for `.png`. JSON output works without a browser. On Linu
 
 ## stdio
 
-The published [v0.1.0](https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.1.0) tarball is the default Cursor configuration. Add it to `.cursor/mcp.json` or an MCP host's server settings. Ensure the host's `node` executable is a supported version; use an absolute path to Node if necessary.
+The published [v0.1.0](https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.1.0) tarball can be added to `.cursor/mcp.json` or an MCP host's server settings. That existing release does not contain the dependency upgrade or PNG optimizations in this checkout. Use the local build configuration below to use these changes. Ensure the host's `node` executable is a supported version; use an absolute path to Node if necessary.
 
 ```json
 {
@@ -38,7 +38,9 @@ The published [v0.1.0](https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.
 }
 ```
 
-After npm publication, `npx -y plan-viz-mcp` is equivalent. For a local checkout, build first (`npm run build`) and point the host at `dist/stdio.js`:
+The committed Cursor configuration uses the local build and [Cursor's `${workspaceFolder}` interpolation](https://cursor.com/docs/mcp#config-interpolation), so it works regardless of the checkout location. Build first (`npm run build`) and ensure Cursor resolves Node 24. If it resolves an older version, select a supported Node installation for the host or locally set `command` to that executable's absolute path; keep personal paths out of commits.
+
+After npm publication, `npx -y plan-viz-mcp` can launch the published package. For other MCP hosts, use an absolute path to the local build:
 
 ```json
 {
@@ -60,6 +62,19 @@ npx @modelcontextprotocol/inspector --cli node dist/stdio.js --method tools/list
 ```
 
 `npm start` is convenient for manual execution. Configure hosts to launch `node dist/stdio.js` directly so npm's own script banners cannot pollute the protocol stream. Server diagnostics go to stderr.
+
+## Codex setup
+
+Codex uses its own MCP configuration; the Cursor configuration and `/visualize` project command do not configure the Codex extension. After building, run this from the repository root with Node 24 selected:
+
+```sh
+codex mcp add plan-viz -- "$(node -p 'process.execPath')" "$PWD/dist/stdio.js"
+codex mcp list
+```
+
+This registers the actual Node executable and absolute build path in your user-level Codex configuration. For project-only setup, merge a `[mcp_servers.plan-viz]` entry with `command` and `args` into the ignored `.codex/config.toml`, preserving other settings. See the [official Codex MCP documentation](https://developers.openai.com/codex/mcp).
+
+Start a new Codex session after configuration and use the [plain MCP prompt](examples/README.md#plain-prompt-in-an-mcp-enabled-chat). Check that the `visualize` tool is available before requesting an export.
 
 ## Cursor command: `/visualize`
 
@@ -83,7 +98,7 @@ ProjectionExec: expr=[id, name, age]
 ```
 
 ```
-/visualize format=.excalidraw tests/fixtures/sample-plan.ts example_1.excalidraw
+/visualize examples/plans/simple.txt examples/output/simple.excalidraw
 ```
 
 ```
@@ -91,7 +106,7 @@ ProjectionExec: expr=[id, name, age]
 ```
 
 ```
-/visualize tests/join.sql example_join.png
+/visualize examples/plans/wide.txt examples/output/wide.png
 ```
 
 ```
@@ -102,6 +117,8 @@ ProjectionExec: expr=[id, name, age]
 ```
 
 The first and last examples write `example_1.png` and `projection-filter-datasource.png` respectively. Open `.excalidraw` results in Excalidraw or [plan-visualizer](https://nga-tran.github.io/plan-visualizer/).
+
+For ready-to-run manual tests, use the plain-text plans in [`examples/plans/`](examples/plans/) and the [copyable MCP commands](examples/README.md). Save generated files to `examples/output/`, which is ignored by Git.
 
 ## Streamable HTTP
 
@@ -227,7 +244,9 @@ Pass the entire table as `plan` with either format. EXPLAIN ANALYZE tables using
 | PNG rendering                  | One active export, four queued jobs, 30 seconds including queue wait |
 | PNG dimensions                 | 16 megapixels; maximum 16384 pixels per side                         |
 
-Large conversions run in terminable workers to keep the server responsive. PNG requests lazily start one Chromium process and use a fresh context for each export. Cancellation, timeouts, and shutdown release workers and browser contexts; a subsequent request can restart a crashed browser. No plan/result cache is retained. Chromium may create temporary runtime profiles managed by Playwright.
+Large conversions run in terminable workers to keep the server responsive. PNG requests lazily start one Chromium process and reuse its loaded page and fonts for subsequent exports. Each request renders its own scene; there is no plan/result cache. Failed, cancelled, or timed-out exports discard their context, and subsequent requests recreate it. Shutdown closes the retained context and browser; a subsequent request can restart a crashed browser. Chromium may create temporary runtime profiles managed by Playwright.
+
+Keep the MCP server running between PNG requests to benefit from the warm renderer. The first PNG still pays for Chromium startup and loading Excalidraw. After rebuilding or changing `.cursor/mcp.json`, reload the plan-viz MCP server in Cursor once. The `/visualize` command should reuse that server for later requests.
 
 A resource-limit error never returns a partial image. Request `.excalidraw` when the image dimensions are too large, or submit a smaller plan when conversion or result size limits are reached. Operator support and interpretation come from `plan-viz`; accepting text does not validate SQL semantics.
 
@@ -241,9 +260,12 @@ npm run build
 npm test
 npm run test:png
 npm run test:package
+npm run benchmark:png
 ```
 
 Build before running tests: process/worker tests exercise compiled files. `npm test` uses fake images and does not launch Chromium. `test:png` requires Chromium and fails instead of skipping when unavailable. It checks real image pixels, bundled fonts, offline rendering, both transports, crash recovery, and cancellation. CI runs fast tests on Node 22 and 24 and browser/package tests on Node 24.
+
+`benchmark:png` measures the sample, wide, and tall plans using a new browser for each plan and repeated exports within that browser. It reports the first request separately from the median of later requests. See [PNG performance measurements](docs/png-performance.md) for the dependency-only comparison and reproduction instructions. These timings use synchronous conversion and exclude production worker startup, MCP transport, host-side image display, and file saving.
 
 `test:package` packs the build, installs it with production dependencies into a fresh temporary directory, and exercises both formats over stdio and HTTP outside the source tree. It prints the retained package artifact location. This command may access npm but never publishes anything.
 

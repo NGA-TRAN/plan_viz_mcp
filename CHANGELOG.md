@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Pin `plan-viz` to 0.1.23 to preserve operator labels in exported scenes without browser binding repair.
+
+### Changed
+
+- Reuse the loaded Chromium page and fonts after successful PNG exports. Discard failed or cancelled contexts and recreate them for later requests.
+- Point the workspace's Cursor MCP configuration at the local build with portable workspace paths so it uses these changes.
+
+### Added
+
+- `npm run benchmark:png` reports cold and warm PNG timings, including conversion, browser setup, bundle loading, and rendering.
+- Four manual plan examples with PNG/Excalidraw commands, ignored output files, and separate Cursor and Codex setup instructions.
+
 ## [0.1.0] - 2026-09-21
 
 ### Added

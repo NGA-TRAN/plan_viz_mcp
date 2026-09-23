@@ -1,0 +1,11 @@
+FilterExec: age > 18
+  FilterExec: age < 90
+    FilterExec: score > 10
+      FilterExec: score < 100
+        FilterExec: visits > 0
+          FilterExec: visits < 1000
+            FilterExec: balance > 0
+              FilterExec: balance < 10000
+                FilterExec: id > 0
+                  FilterExec: id < 1000000
+                    DataSourceExec: file_groups={1 groups: [[data.parquet]]}
