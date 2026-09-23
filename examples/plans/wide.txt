@@ -1,0 +1,9 @@
+UnionExec
+  DataSourceExec: file_groups={1 groups: [[north.parquet]]}
+  DataSourceExec: file_groups={1 groups: [[south.parquet]]}
+  DataSourceExec: file_groups={1 groups: [[east.parquet]]}
+  DataSourceExec: file_groups={1 groups: [[west.parquet]]}
+  DataSourceExec: file_groups={1 groups: [[central.parquet]]}
+  DataSourceExec: file_groups={1 groups: [[coastal.parquet]]}
+  DataSourceExec: file_groups={1 groups: [[inland.parquet]]}
+  DataSourceExec: file_groups={1 groups: [[island.parquet]]}

@@ -1,5 +1,10 @@
 import { readFile } from 'node:fs/promises';
-import { chromium, type Browser, type BrowserContext } from 'playwright';
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from 'playwright';
 import {
   MAX_IMAGE_SIDE,
   MAX_PIXELS,
@@ -25,9 +30,10 @@ export interface RendererOptions {
   assets?: URL;
 }
 
-/** One browser, one active export, bounded queue; no scene caching. */
+/** One warm page, one active export, bounded queue; no scene/result cache. */
 export class PngRenderer {
   private browser?: Promise<Browser>;
+  private session?: { context: BrowserContext; page: Page };
   private stopped = false;
   private gate: BoundedGate;
   private shutdown = new AbortController();
@@ -60,6 +66,7 @@ export class PngRenderer {
         }
         browser.on('disconnected', () => {
           this.browser = undefined;
+          this.session = undefined;
         });
         return browser;
       })
@@ -95,9 +102,12 @@ export class PngRenderer {
     ]);
     let release: (() => void) | undefined;
     let context: BrowserContext | undefined;
+    let succeeded = false;
     let contextClosing: Promise<void> | undefined;
-    const closeContext = () =>
-      (contextClosing ??= context?.close().catch(() => {}));
+    const closeContext = () => {
+      if (this.session?.context === context) this.session = undefined;
+      return (contextClosing ??= context?.close().catch(() => {}));
+    };
     const abort = () => {
       void closeContext();
     };
@@ -105,39 +115,54 @@ export class PngRenderer {
     try {
       release = await this.gate.acquire(signal);
       const browser = await abortable(this.getBrowser(), signal);
-      // Close a context even if cancellation races its creation.
-      context = await browser.newContext({
-        serviceWorkers: 'block',
-        acceptDownloads: false,
-      });
-      if (signal.aborted) throw cancelled(signal);
-      const assets = this.options.assets ?? ASSETS;
-      await context.route('**/*', async (route) => {
-        const url = new URL(route.request().url());
-        if (url.origin !== ORIGIN) return route.abort();
-        if (url.pathname === '/')
-          return route.fulfill({ contentType: 'text/html', body: HTML });
-        // Only generated bundles and font assets are addressable, with no traversal.
-        if (
-          !/^\/(?:[\w.-]+\.(?:js|wasm)|fonts\/[\w/-]+\.woff2)$/.test(
-            url.pathname,
+      let page = this.session?.page;
+      context = this.session?.context;
+      if (page?.isClosed()) {
+        await closeContext();
+        context = undefined;
+        contextClosing = undefined;
+        page = undefined;
+      }
+      if (!page) {
+        // Close a context even if cancellation races its creation.
+        context = await browser.newContext({
+          serviceWorkers: 'block',
+          acceptDownloads: false,
+        });
+        if (signal.aborted) throw cancelled(signal);
+        const assets = this.options.assets ?? ASSETS;
+        await context.route('**/*', async (route) => {
+          const url = new URL(route.request().url());
+          if (url.origin !== ORIGIN) return route.abort();
+          if (url.pathname === '/')
+            return route.fulfill({ contentType: 'text/html', body: HTML });
+          // Only generated bundles and font assets are addressable, with no traversal.
+          if (
+            !/^\/(?:[\w.-]+\.(?:js|wasm)|fonts\/[\w/-]+\.woff2)$/.test(
+              url.pathname,
+            )
           )
-        )
-          return route.abort();
-        try {
-          const body = await readFile(new URL(`.${url.pathname}`, assets));
-          const contentType = url.pathname.endsWith('.woff2')
-            ? 'font/woff2'
-            : url.pathname.endsWith('.wasm')
-              ? 'application/wasm'
-              : 'application/javascript';
-          await route.fulfill({ body, contentType });
-        } catch {
-          await route.abort();
-        }
-      });
-      const page = await context.newPage();
-      await page.goto(`${ORIGIN}/`);
+            return route.abort();
+          try {
+            const body = await readFile(new URL(`.${url.pathname}`, assets));
+            const contentType = url.pathname.endsWith('.woff2')
+              ? 'font/woff2'
+              : url.pathname.endsWith('.wasm')
+                ? 'application/wasm'
+                : 'application/javascript';
+            await route.fulfill({ body, contentType });
+          } catch {
+            await route.abort();
+          }
+        });
+        page = await context.newPage();
+        const pageContext = context;
+        page.on('crash', () => {
+          if (this.session?.context === pageContext) this.session = undefined;
+          void pageContext.close().catch(() => {});
+        });
+        await page.goto(`${ORIGIN}/`);
+      }
       const data = await page.evaluate(
         async ({ scene, pixels, side }) => {
           const renderer = (
@@ -155,6 +180,8 @@ export class PngRenderer {
         { scene, pixels: MAX_PIXELS, side: MAX_IMAGE_SIDE },
       );
       if (signal.aborted) throw cancelled(signal);
+      this.session = { context: context!, page };
+      succeeded = true;
       return Buffer.from(data, 'base64');
     } catch (error) {
       if (signal.aborted) throw cancelled(signal);
@@ -172,7 +199,9 @@ export class PngRenderer {
     } finally {
       clearTimeout(timer);
       signal.removeEventListener('abort', abort);
-      await closeContext();
+      // Keep code and fonts warm only after a successful export. Failed or
+      // cancelled jobs must not leave browser work running for the next caller.
+      if (!succeeded || signal.aborted) await closeContext();
       release?.();
     }
   }
@@ -182,6 +211,8 @@ export class PngRenderer {
       this.stopped = true;
       this.shutdown.abort();
       await Promise.allSettled(this.active);
+      await this.session?.context.close().catch(() => {});
+      this.session = undefined;
       const browser = await this.browser?.catch(() => undefined);
       await browser?.close();
     })();

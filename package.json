@@ -46,6 +46,7 @@
     "test": "vitest run --exclude '**/png.integration.test.ts'",
     "test:png": "vitest run tests/png.integration.test.ts",
     "test:package": "node scripts/smoke-package.mjs",
+    "benchmark:png": "node scripts/benchmark-png.mjs",
     "start": "node dist/stdio.js",
     "start:http": "node dist/http.js",
     "prepack": "npm run build"
@@ -62,7 +63,7 @@
   "dependencies": {
     "@modelcontextprotocol/node": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
-    "plan-viz": "0.1.22",
+    "plan-viz": "0.1.23",
     "playwright": "1.63.0",
     "zod": "4.6.5"
   },

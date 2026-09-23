@@ -71,7 +71,7 @@ describe('real Chromium export (required, never skipped)', () => {
     }
   }, 60_000);
 
-  it('exports raw and table plans offline, loads fonts, reuses browser and closes contexts', async () => {
+  it('exports raw and table plans offline, reuses the loaded page/fonts and closes on shutdown', async () => {
     let browser!: Browser;
     const requests: string[] = [];
     const loadedFonts: string[] = [];
@@ -96,8 +96,13 @@ describe('real Chromium export (required, never skipped)', () => {
     for (const plan of [samplePlan, explainPlan, analyzePlan])
       assertPng(await renderer.render(convertPlanToExcalidraw(plan)));
     expect(launch).toHaveBeenCalledOnce();
-    expect(contexts).toHaveLength(3);
-    expect(browser.contexts()).toHaveLength(0);
+    expect(contexts).toHaveLength(1);
+    expect(browser.contexts()).toHaveLength(1);
+    expect(contexts[0]!.pages()).toHaveLength(1);
+    expect(requests.filter((url) => url.endsWith('/browser.js'))).toHaveLength(
+      1,
+    );
+    expect(new Set(loadedFonts).size).toBe(loadedFonts.length);
     expect(loadedFonts.some((url) => url.includes('/Nunito/'))).toBe(true);
     expect(loadedFonts.some((url) => url.includes('/Lilita/'))).toBe(true);
     expect(
@@ -105,6 +110,9 @@ describe('real Chromium export (required, never skipped)', () => {
         url.startsWith('http://plan-viz-renderer.local/'),
       ),
     ).toBe(true);
+    await renderer.close();
+    expect(browser.isConnected()).toBe(false);
+    expect(browser.contexts()).toHaveLength(0);
   }, 60_000);
 
   it('rejects huge diagrams before allocation and recovers after browser crash', async () => {
@@ -121,6 +129,8 @@ describe('real Chromium export (required, never skipped)', () => {
       code: 'IMAGE_TOO_LARGE',
     });
     expect(browser.contexts()).toHaveLength(0);
+    assertPng(await renderer.render(convertPlanToExcalidraw(samplePlan)));
+    expect(browser.contexts()).toHaveLength(1);
     await browser.close();
     assertPng(await renderer.render(convertPlanToExcalidraw(samplePlan)));
     expect(launch).toHaveBeenCalledTimes(2);
@@ -157,7 +167,162 @@ describe('real Chromium export (required, never skipped)', () => {
     controller.abort();
     await check;
     expect(browser.contexts()).toHaveLength(0);
+    // The failed context must be replaced on the next request.
+    vi.mocked(browser.newContext).mockRestore();
+    assertPng(await renderer.render(convertPlanToExcalidraw(samplePlan)));
   }, 60_000);
+
+  it('renders changed scenes on a warm page and replaces a closed page', async () => {
+    const browser = await chromium.launch();
+    const renderer = new PngRenderer({ launch: async () => browser, assets });
+    cleanups.push(() => renderer.close());
+    const scene = convertPlanToExcalidraw(samplePlan);
+    const original = PNG.sync.read(await renderer.render(scene));
+    scene.appState.viewBackgroundColor = '#ff0000';
+    const changed = PNG.sync.read(await renderer.render(scene));
+    expect(changed.data.subarray(0, 4)).toEqual(Buffer.from([255, 0, 0, 255]));
+    expect(changed.data).not.toEqual(original.data);
+    const context = browser.contexts()[0]!;
+    await context.pages()[0]!.close();
+    assertPng(await renderer.render(convertPlanToExcalidraw(samplePlan)));
+    expect(browser.contexts()).toHaveLength(1);
+    expect(browser.contexts()[0]).not.toBe(context);
+  }, 60_000);
+
+  it('cancels a queued request without closing the active warm page or mixing scenes', async () => {
+    const browser = await chromium.launch();
+    const renderer = new PngRenderer({ launch: async () => browser, assets });
+    cleanups.push(() => renderer.close());
+    const scene = convertPlanToExcalidraw(samplePlan);
+    await renderer.render(scene);
+    const context = browser.contexts()[0]!;
+    const red = structuredClone(scene);
+    red.appState.viewBackgroundColor = '#ff0000';
+    const blue = structuredClone(scene);
+    blue.appState.viewBackgroundColor = '#0000ff';
+    const first = renderer.render(red);
+    const controller = new AbortController();
+    const cancelled = expect(
+      renderer.render(scene, controller.signal),
+    ).rejects.toMatchObject({ code: 'CANCELLED' });
+    const last = renderer.render(blue);
+    controller.abort();
+    await cancelled;
+    const images = await Promise.all([first, last]);
+    expect(PNG.sync.read(images[0]!).data.subarray(0, 4)).toEqual(
+      Buffer.from([255, 0, 0, 255]),
+    );
+    expect(PNG.sync.read(images[1]!).data.subarray(0, 4)).toEqual(
+      Buffer.from([0, 0, 255, 255]),
+    );
+    expect(browser.contexts()).toEqual([context]);
+  }, 60_000);
+
+  it('replaces a crashed warm page without restarting the browser', async () => {
+    const browser = await chromium.launch();
+    const launch = vi.fn(async () => browser);
+    const renderer = new PngRenderer({ launch, assets });
+    cleanups.push(() => renderer.close());
+    const scene = convertPlanToExcalidraw(samplePlan);
+    assertPng(await renderer.render(scene));
+    const context = browser.contexts()[0]!;
+    const page = context.pages()[0]!;
+    const cdp = await context.newCDPSession(page);
+    const closed = context.waitForEvent('close');
+    // Crash the renderer process, not the entire Chromium instance.
+    await cdp.send('Page.crash').catch(() => {});
+    await closed;
+    expect(browser.isConnected()).toBe(true);
+    assertPng(await renderer.render(scene));
+    expect(launch).toHaveBeenCalledOnce();
+    expect(browser.contexts()).toHaveLength(1);
+    expect(browser.contexts()[0]).not.toBe(context);
+  }, 60_000);
+
+  it('shutdown cancels an active warm export and queued work', async () => {
+    const browser = await chromium.launch();
+    const renderer = new PngRenderer({ launch: async () => browser, assets });
+    cleanups.push(() => renderer.close());
+    const scene = convertPlanToExcalidraw(samplePlan);
+    await renderer.render(scene);
+    const page = browser.contexts()[0]!.pages()[0]!;
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    await page.exposeFunction('exportStarted', () => entered());
+    await page.evaluate(() => {
+      const browserWindow = window as unknown as {
+        exportStarted: () => Promise<void>;
+        PlanVizRenderer: unknown;
+      };
+      browserWindow.PlanVizRenderer = {
+        renderScene: async () => {
+          await browserWindow.exportStarted();
+          return new Promise(() => {});
+        },
+      };
+    });
+    const active = expect(renderer.render(scene)).rejects.toMatchObject({
+      code: 'CANCELLED',
+    });
+    await started;
+    const queued = expect(renderer.render(scene)).rejects.toMatchObject({
+      code: 'CANCELLED',
+    });
+    await renderer.close();
+    await Promise.all([active, queued]);
+    expect(browser.isConnected()).toBe(false);
+    expect(browser.contexts()).toHaveLength(0);
+    await expect(renderer.render(scene)).rejects.toMatchObject({
+      code: 'CANCELLED',
+    });
+  }, 60_000);
+
+  it.each(['cancel', 'timeout'] as const)(
+    'discards a warm page after %s and recovers',
+    async (mode) => {
+      const browser = await chromium.launch();
+      const renderer = new PngRenderer({
+        launch: async () => browser,
+        assets,
+        timeoutMs: 3_000,
+      });
+      cleanups.push(() => renderer.close());
+      const scene = convertPlanToExcalidraw(samplePlan);
+      assertPng(await renderer.render(scene));
+      const page = browser.contexts()[0]!.pages()[0]!;
+      // Hang the browser export itself so cancellation must close the context.
+      await page.evaluate(() => {
+        (window as unknown as { PlanVizRenderer: unknown }).PlanVizRenderer = {
+          renderScene: () => new Promise(() => {}),
+        };
+      });
+      let entered!: () => void;
+      const started = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      const evaluate = page.evaluate.bind(page);
+      vi.spyOn(page, 'evaluate').mockImplementation(
+        (...args: Parameters<typeof page.evaluate>) => {
+          entered();
+          return evaluate(...args);
+        },
+      );
+      const controller = new AbortController();
+      const check = expect(
+        renderer.render(scene, controller.signal),
+      ).rejects.toMatchObject({
+        code: mode === 'cancel' ? 'CANCELLED' : 'RENDER_TIMEOUT',
+      });
+      await started;
+      if (mode === 'cancel') controller.abort();
+      await check;
+      expect(browser.contexts()).toHaveLength(0);
+      assertPng(await renderer.render(scene));
+    },
+    60_000,
+  );
 
   it('returns real PNG over HTTP and stdio', async () => {
     const renderer = new PngRenderer({ assets });

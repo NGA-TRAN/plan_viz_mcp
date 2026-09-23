@@ -2,8 +2,8 @@ import { exportToBlob, restoreElements } from '@excalidraw/excalidraw';
 import type { Scene } from '../lib/visualize.js';
 
 // This is the only boundary between plan-viz's scene types and Excalidraw's
-// versioned element types. plan-viz omits the reverse text binding on some
-// containers; Excalidraw's import repair makes those labels visible on export.
+// versioned element types. plan-viz >= 0.1.23 supplies reciprocal text bindings,
+// so the old repairBindings workaround is no longer needed.
 export async function renderScene(
   scene: Scene,
   limits: { pixels: number; side: number },
@@ -11,7 +11,6 @@ export async function renderScene(
   const elements = restoreElements(
     scene.elements as unknown as Parameters<typeof restoreElements>[0],
     null,
-    { repairBindings: true },
   );
   const blob = await exportToBlob({
     elements,
