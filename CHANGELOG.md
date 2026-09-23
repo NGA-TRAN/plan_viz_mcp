@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-22
+
 ### Fixed
 
 - Pin `plan-viz` to 0.1.23 to preserve operator labels in exported scenes without browser binding repair.
@@ -33,5 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cursor `/visualize` project command.
 - CI on Node.js 22 and 24, plus Chromium and packed-package smoke tests on Node 24.
 
-[Unreleased]: https://github.com/NGA-TRAN/plan_viz_mcp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/NGA-TRAN/plan_viz_mcp/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/NGA-TRAN/plan_viz_mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.1.0

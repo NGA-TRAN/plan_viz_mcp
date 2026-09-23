@@ -18,11 +18,11 @@ A server is configured when **either**:
 1. If `visualize` from plan-viz is already in the available MCP tools, skip to **Inputs**.
    Reuse the running server across requests so PNG exports keep the renderer and fonts loaded. Do not restart or rebuild the server for each image.
 2. Otherwise read [`.cursor/mcp.json`](.cursor/mcp.json) if it exists. Then read `~/.cursor/mcp.json` if it exists. Look for `mcpServers.plan-viz`.
-3. Supported configurations include stdio `npx` of the [v0.1.0 release tarball](https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.1.0), `npx` / `plan-viz-mcp`, `npx` / `github:NGA-TRAN/plan_viz_mcp`, or `node` (including an absolute path to Node) with args that end in `dist/stdio.js`. The local path may use Cursor's `${workspaceFolder}` variable. A loopback HTTP URL ending in `/mcp` is also supported. Preserve an existing configuration; if it fails, report the connection error instead of replacing it with another version.
+3. Supported configurations include stdio `npx` of the [v0.1.1 release tarball](https://github.com/NGA-TRAN/plan_viz_mcp/releases/tag/v0.1.1), `npx` / `plan-viz-mcp`, `npx` / `github:NGA-TRAN/plan_viz_mcp`, or `node` (including an absolute path to Node) with args that end in `dist/stdio.js`. The local path may use Cursor's `${workspaceFolder}` variable. A loopback HTTP URL ending in `/mcp` is also supported. Preserve an existing configuration; if it fails, report the connection error instead of replacing it with another version. If it explicitly uses v0.1.0, explain that v0.1.1 includes the label and PNG performance fixes and offer the updated release URL.
 
 ### Configure if missing or invalid
 
-1. For PNG later, Chromium must be installed (`npx playwright install chromium`); do that only if the user asked for `.png` or left format default.
+1. For PNG later, Chromium must be installed (`npx playwright install chromium` in this checkout, or `npx -y playwright@1.63.0 install chromium` for the release tarball); do that only if the user asked for `.png` or left format default.
 2. In this source checkout, build with a supported Node version (`npm run build`) if `dist/stdio.js` is missing. Write or merge **project** [`.cursor/mcp.json`](.cursor/mcp.json), preserving every other `mcpServers` entry:
 
 ```json
@@ -37,7 +37,7 @@ A server is configured when **either**:
 }
 ```
 
-Outside a source checkout, the published release can be used instead. Explain that v0.1.0 does not include this checkout's PNG performance and label fixes:
+Outside a source checkout, use the published v0.1.1 release, which includes the PNG performance and label fixes:
 
 ```json
 {
@@ -46,7 +46,7 @@ Outside a source checkout, the published release can be used instead. Explain th
       "command": "npx",
       "args": [
         "-y",
-        "https://github.com/NGA-TRAN/plan_viz_mcp/releases/download/v0.1.0/plan-viz-mcp-0.1.0.tgz"
+        "https://github.com/NGA-TRAN/plan_viz_mcp/releases/download/v0.1.1/plan-viz-mcp-0.1.1.tgz"
       ]
     }
   }

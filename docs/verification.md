@@ -18,6 +18,7 @@ PR verification was rerun on 2026-09-22 using Node.js 24.21.0 on macOS arm64, wi
 - A clean `npm ci` succeeds and reports zero known vulnerabilities with the locked dependency versions.
 - The packed package installs with production dependencies in a fresh temporary directory and serves both formats over both transports outside the source checkout.
 - The PR recheck visually inspected the simple and wide PNGs: operator titles, properties, arrows, and source labels are visible without clipping. Browser tests also validate operator-title pixels automatically.
+- [PR #4 CI](https://github.com/NGA-TRAN/plan_viz_mcp/actions/runs/35801794789) passed on GitHub-hosted Linux runners: Node 22/24 checks and the real Chromium/packed-package job.
 
 ## Implementation decisions supported by measurements
 
@@ -33,8 +34,7 @@ The PR recheck ran `BENCH_ROUNDS=9 npm run benchmark:png`: cold exports took 367
 
 ## Verification limits
 
-- CI configuration is included but has not been executed on a remote CI runner.
 - Cursor/Codex desktop image presentation has not been tested interactively. Protocol image delivery is tested; each host controls its own image display/download UI.
 - The portable Cursor config requires the host to resolve Node 22.13+ (Node 24 recommended). Codex registration is a separate per-user or per-project setup step documented in the README; it is not installed by this PR.
 
-No npm publication or public deployment was performed.
+Distribution uses a GitHub release tarball. No npm registry publication or public server deployment is part of this release.
