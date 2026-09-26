@@ -55,6 +55,15 @@ export function createServer(dependencies: VisualizeDependencies): McpServer {
               : [{ type: 'image', data: output.data, mimeType: MIME['.png'] }],
           structuredContent: metadata,
         };
+        if (output.format === '.excalidraw') {
+          const dataUrl = `data:application/json;base64,${Buffer.from(output.text).toString('base64')}`;
+          result.content.push({
+            type: 'text',
+            text: `[Open in Excalidraw](https://excalidraw.com/#url=${encodeURIComponent(dataUrl)})`,
+          });
+          if (Buffer.byteLength(JSON.stringify(result)) > MAX_RESULT_BYTES)
+            result.content.pop();
+        }
         if (Buffer.byteLength(JSON.stringify(result)) > MAX_RESULT_BYTES)
           throw tooLarge();
         return result;
