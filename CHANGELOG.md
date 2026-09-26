@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Excalidraw output includes an editable import link with the scene embedded in the URL.
+
 ## [0.1.1] - 2026-09-22
 
 ### Fixed

@@ -185,7 +185,7 @@ The successful result has `isError: false`, a text block containing the complete
 { "format": ".excalidraw", "mimeType": "application/json" }
 ```
 
-in `structuredContent`. Parse the text with `JSON.parse`; the result has `type: "excalidraw"` and a nonempty `elements` array. The host can save the returned text as a `.excalidraw` file for editing. The server itself performs no result-file writes.
+in `structuredContent`. Parse the text with `JSON.parse`; the result has `type: "excalidraw"` and a nonempty `elements` array. The host can save the returned text as a `.excalidraw` file for editing. The server itself performs no result-file writes. A second text block contains an **Open in Excalidraw** link with the scene embedded in the URL; no upload is needed. Links are omitted if they would exceed the result-size limit. They can be long, so use the file for clients that limit URL length.
 
 ### 2. PNG image
 

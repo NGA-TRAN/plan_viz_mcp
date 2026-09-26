@@ -46,11 +46,19 @@ describe('MCP contract through the SDK', () => {
         openWorldHint: false,
       });
       for (const plan of [samplePlan, explainPlan, analyzePlan]) {
-        assertScene(
-          await connection.callTool({
-            name: 'visualize',
-            arguments: { plan, format: '.excalidraw' },
-          }),
+        const result = await connection.callTool({
+          name: 'visualize',
+          arguments: { plan, format: '.excalidraw' },
+        });
+        assertScene(result);
+        const [scene, link] = result.content.filter(
+          (block) => block.type === 'text',
+        );
+        const [, dataUrl] = link!.text.match(
+          /^\[Open in Excalidraw\]\(https:\/\/excalidraw\.com\/#url=(.+)\)$/,
+        )!;
+        expect(await (await fetch(decodeURIComponent(dataUrl!))).text()).toBe(
+          scene!.text,
         );
       }
       const png = await connection.callTool({
@@ -66,6 +74,21 @@ describe('MCP contract through the SDK', () => {
       ]);
     },
   );
+
+  it('keeps large scenes available when the link exceeds the result limit', async () => {
+    const connection = await connect();
+    const result = await connection.callTool({
+      name: 'visualize',
+      arguments: {
+        plan:
+          'UnionExec\n' +
+          '  DataSourceExec: partitions=1, partition_sizes=[1]\n'.repeat(1000),
+        format: '.excalidraw',
+      },
+    });
+    expect(result.isError).toBe(false);
+    expect(result.content).toHaveLength(1);
+  });
 
   it('reports tool argument errors without an image', async () => {
     const connection = await connect();
